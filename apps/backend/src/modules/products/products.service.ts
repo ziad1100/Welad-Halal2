@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CacheService } from '../../common/cache/cache.service';
 
 @Injectable()
 export class ProductsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cache: CacheService,
+  ) {}
 
   async list(search?: string, categoryId?: string) {
     const where: any = { isActive: true };
@@ -30,34 +34,48 @@ export class ProductsService {
 
   async byBarcode(code: string) {
     const c = code.trim();
+    // Redis cache first (external fallback stays non-blocking in frontend)
+    const cached = await this.cache.get(`bc:${c}`);
+    if (cached) return JSON.parse(cached);
     // exact match: Product.barcode first, then ProductUnit.barcode
     const product = await this.prisma.product.findFirst({
       where: { barcode: c, isActive: true },
       include: { category: true, units: { where: { isActive: true } }, inventory: true },
     });
-    if (product) return { product, unit: null };
+    if (product) {
+      const res = { product, unit: null };
+      await this.cache.set(`bc:${c}`, JSON.stringify(res));
+      return res;
+    }
     const unit = await this.prisma.productUnit.findFirst({
       where: { barcode: c, isActive: true },
       include: { product: { include: { category: true, units: { where: { isActive: true } }, inventory: true } } },
     });
-    if (unit) return { product: unit.product, unit };
-    // external fallback intentionally non-blocking: return 404, frontend may query OpenFoodFacts
+    if (unit) {
+      const res = { product: unit.product, unit: { ...unit, product: undefined } };
+      await this.cache.set(`bc:${c}`, JSON.stringify(res));
+      return res;
+    }
     throw new NotFoundException('Barcode not found');
   }
 
-  create(dto: any) {
+  async create(dto: any) {
     const { units, ...rest } = dto;
-    return this.prisma.product.create({
+    const p = await this.prisma.product.create({
       data: {
         ...rest,
         units: units ? { create: units } : undefined,
       },
       include: { units: true },
     });
+    if (p.barcode) await this.cache.del(`bc:${p.barcode}`);
+    return p;
   }
 
-  update(id: string, dto: any) {
+  async update(id: string, dto: any) {
     const { units: _u, ...rest } = dto;
-    return this.prisma.product.update({ where: { id }, data: rest });
+    const p = await this.prisma.product.update({ where: { id }, data: rest });
+    if (p.barcode) await this.cache.del(`bc:${p.barcode}`);
+    return p;
   }
 }

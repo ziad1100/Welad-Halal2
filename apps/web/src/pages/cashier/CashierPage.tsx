@@ -4,6 +4,7 @@ import { confirmOrder, holdOrder } from '../../services/api/orders.api';
 import { useCart } from '../../store/cartStore';
 import { useOrder } from '../../store/orderStore';
 import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
+import { NewProductModal } from '../../components/cashier/NewProductModal';
 
 export function CashierPage() {
   const { lines, addLine, setQty, remove, clear, subtotal, count, orderType, setOrderType } = useCart();
@@ -162,11 +163,14 @@ export function CashierPage() {
         <button className="wh-btn" onClick={doConfirm}>تأكيد (F12)</button>
       </div>
       {showNewProduct && (
-        <div className="wh-modal" style={{ position: 'fixed', inset: '20% 30%', zIndex: 50 }}>
-          <h3>صنف جديد — باركود {showNewProduct}</h3>
-          <p>الباركود غير مسجل. أنشئ الصنف من شاشة الأصناف ثم أعد المسح.</p>
-          <button className="wh-btn" onClick={() => setShowNewProduct(null)}>إغلاق</button>
-        </div>
+        <NewProductModal
+          barcode={showNewProduct}
+          onClose={() => setShowNewProduct(null)}
+          onSaved={(p) => {
+            addLine({ productId: p.id, unitId: null, name: p.name, unitName: 'قطاعي', price: p.basePrice, qty: 1 });
+            load();
+          }}
+        />
       )}
     </div>
   );

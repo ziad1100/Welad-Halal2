@@ -31,3 +31,6 @@ npm-debug.log*
 
 # Turbo
 .turbo
+
+# TypeScript build info
+*.tsbuildinfo
