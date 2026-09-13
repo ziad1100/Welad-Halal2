@@ -1,0 +1,359 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  owner
+  manager
+  employee
+}
+
+enum PartyType {
+  supplier
+  customer
+  both
+}
+
+enum ItemType {
+  stock
+  service
+  composite
+}
+
+enum OrderType {
+  pickup
+  delivery
+}
+
+enum OrderStatus {
+  pending
+  held
+  confirmed
+  cancelled
+  returned
+}
+
+enum PaymentMethod {
+  cash
+  card
+  mixed
+}
+
+enum MovementType {
+  sale
+  purchase
+  return_in
+  return_out
+  manufacturing_in
+  manufacturing_out
+  adjustment
+}
+
+enum DiscountType {
+  percentage
+  fixed_amount
+}
+
+enum ShiftStatus {
+  open
+  closed
+}
+
+model User {
+  id                  String    @id @default(uuid())
+  fullName            String
+  username            String    @unique
+  passwordHash        String
+  role                Role      @default(employee)
+  permissionLevel     Int       @default(10)
+  isOwner             Boolean   @default(false)
+  isActive            Boolean   @default(true)
+  forcePasswordChange Boolean   @default(false)
+  createdByUserId     String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  employee            Employee?
+  orders              Order[]
+  auditLogs           AuditLog[]
+}
+
+model Branch {
+  id        String      @id @default(uuid())
+  name      String
+  isActive  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  inventory Inventory[]
+  orders    Order[]
+  purchases Purchase[]
+  expenses  Expense[]
+  shifts    Shift[]
+  movements StockMovement[]
+}
+
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Party {
+  id             String    @id @default(uuid())
+  type           PartyType
+  name           String
+  phone          String?
+  address        String?
+  loyaltyPoints  Int       @default(0)
+  creditBalance  Float     @default(0)
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  products       Product[] @relation("SupplierProducts")
+  orders         Order[]
+  purchases      Purchase[]
+}
+
+model Category {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  isPinned  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
+}
+
+model Product {
+  id          String      @id @default(uuid())
+  name        String
+  description String?
+  barcode     String?     @unique
+  type        ItemType    @default(stock)
+  basePrice   Float       @default(0)
+  taxRate     Float       @default(0)
+  isActive    Boolean     @default(true)
+  categoryId  String?
+  category    Category?   @relation(fields: [categoryId], references: [id])
+  supplierId  String?
+  supplier    Party?      @relation("SupplierProducts", fields: [supplierId], references: [id])
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  units       ProductUnit[]
+  inventory   Inventory[]
+  movements   StockMovement[]
+  orderItems  OrderItem[]
+  purchaseItems PurchaseItem[]
+  bomAsComposite BomItem[] @relation("CompositeBoms")
+  bomAsRaw       BomItem[] @relation("RawBoms")
+  manufacturingOrders ManufacturingOrder[]
+}
+
+model ProductUnit {
+  id               String   @id @default(uuid())
+  productId        String
+  product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  unitName         String
+  barcode          String?  @unique
+  conversionFactor Float    @default(1)
+  sellingPrice     Float    @default(0)
+  taxRate          Float    @default(0)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  orderItems       OrderItem[]
+  purchaseItems    PurchaseItem[]
+}
+
+model Inventory {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  quantity  Float    @default(0)
+  avgCost   Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, branchId])
+}
+
+model StockMovement {
+  id        String       @id @default(uuid())
+  productId String
+  product   Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  branchId  String?
+  branch    Branch?      @relation(fields: [branchId], references: [id])
+  type      MovementType
+  qtyDelta  Float
+  costAtTime Float       @default(0)
+  refId     String?
+  note      String?
+  createdAt DateTime     @default(now())
+}
+
+model DiscountCode {
+  id         String       @id @default(uuid())
+  code       String       @unique
+  type       DiscountType
+  value      Float
+  validFrom  DateTime?
+  validTo    DateTime?
+  usageLimit Int?
+  usedCount  Int          @default(0)
+  isActive   Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  orders     Order[]
+}
+
+model Order {
+  id             String        @id @default(uuid())
+  reference      String        @unique
+  type           OrderType     @default(pickup)
+  status         OrderStatus   @default(pending)
+  paymentMethod  PaymentMethod @default(cash)
+  subtotal       Float         @default(0)
+  discountTotal  Float         @default(0)
+  deliveryFee    Float         @default(0)
+  total          Float         @default(0)
+  userId         String
+  user           User          @relation(fields: [userId], references: [id])
+  branchId       String
+  branch         Branch        @relation(fields: [branchId], references: [id])
+  customerId     String?
+  customer       Party?        @relation(fields: [customerId], references: [id])
+  discountCodeId String?
+  discountCode   DiscountCode? @relation(fields: [discountCodeId], references: [id])
+  publicToken    String?       @unique
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  items          OrderItem[]
+  ratings        OrderRating[]
+}
+
+model OrderItem {
+  id          String       @id @default(uuid())
+  orderId     String
+  order       Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product      @relation(fields: [productId], references: [id])
+  unitId      String?
+  unit        ProductUnit? @relation(fields: [unitId], references: [id])
+  productName String
+  unitName    String?
+  qty         Float
+  unitPrice   Float
+  lineTotal   Float
+  createdAt   DateTime     @default(now())
+}
+
+model OrderRating {
+  id        String   @id @default(uuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  stars     Int
+  comment   String?
+  createdAt DateTime @default(now())
+}
+
+model Purchase {
+  id         String   @id @default(uuid())
+  supplierId String
+  supplier   Party    @relation(fields: [supplierId], references: [id])
+  branchId   String
+  branch     Branch   @relation(fields: [branchId], references: [id])
+  total      Float    @default(0)
+  isReceived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  items      PurchaseItem[]
+}
+
+model PurchaseItem {
+  id        String       @id @default(uuid())
+  purchaseId String
+  purchase  Purchase     @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product      @relation(fields: [productId], references: [id])
+  unitId    String?
+  unit      ProductUnit? @relation(fields: [unitId], references: [id])
+  qty       Float
+  unitCost  Float
+  lineTotal Float
+}
+
+model BomItem {
+  id          String  @id @default(uuid())
+  compositeId String
+  composite   Product @relation("CompositeBoms", fields: [compositeId], references: [id], onDelete: Cascade)
+  rawId       String
+  raw         Product @relation("RawBoms", fields: [rawId], references: [id])
+  qtyNeeded   Float
+}
+
+model ManufacturingOrder {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  qty       Float
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Expense {
+  id        String   @id @default(uuid())
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  category  String
+  amount    Float
+  note      String?
+  createdAt DateTime @default(now())
+}
+
+model Employee {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  position  String?
+  phone     String?
+  salary    Float?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  shifts    Shift[]
+}
+
+model Shift {
+  id          String      @id @default(uuid())
+  employeeId  String
+  employee    Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  branchId    String
+  branch      Branch      @relation(fields: [branchId], references: [id])
+  status      ShiftStatus @default(open)
+  openingCash Float       @default(0)
+  closingCash Float?
+  expectedCash Float?
+  openedAt    DateTime    @default(now())
+  closedAt    DateTime?
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now())
+}

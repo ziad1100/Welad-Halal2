@@ -1,0 +1,33 @@
+# Deps
+node_modules
+dist
+build
+.next
+
+# Env — NEVER commit secrets
+.env
+.env.local
+.env.production
+.env.*.local
+.env.*.production
+apps/*/dist
+
+# Prisma
+*.db
+*.db-journal
+
+# Docker volumes
+postgres-data
+redis-data
+
+# OS / editors
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.log
+npm-debug.log*
+
+# Turbo
+.turbo

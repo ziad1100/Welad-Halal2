@@ -1,0 +1,45 @@
+/* Welad Halal legacy WinForms theme — sharp corners, beveled buttons, dense tables */
+:root {
+  --wh-header: #5c7a47;
+  --wh-bg: #edead8;
+  --wh-cart-active: #f5d742;
+  --wh-total: #4caf50;
+  --wh-row: #eddde7;
+  --wh-row-sel: #3388e0;
+  --wh-modal: #e3ecdf;
+  --wh-required: #f6ded4;
+  --wh-barcode: #2a3560;
+}
+* { box-sizing: border-box; border-radius: 0 !important; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  background: var(--wh-bg);
+  font-family: Tahoma, 'Segoe UI', Arial, sans-serif;
+  direction: rtl;
+}
+body[dir='ltr'] { direction: ltr; }
+button.wh-btn {
+  border: 2px outset #fff;
+  background: #f0f0f0;
+  border-top-color: #fff; border-left-color: #fff;
+  border-bottom-color: #808080; border-right-color: #808080;
+  padding: 6px 12px; font-family: inherit; cursor: pointer;
+}
+button.wh-btn:active {
+  border-style: inset;
+  border-top-color: #808080; border-left-color: #808080;
+  border-bottom-color: #fff; border-right-color: #fff;
+}
+table.wh-table { border-collapse: collapse; width: 100%; background: #fff; }
+table.wh-table th, table.wh-table td { border: 1px solid #808080; padding: 4px 6px; font-size: 13px; }
+table.wh-table thead th { background: var(--wh-header); color: #fff; }
+tr.wh-active { background: var(--wh-cart-active) !important; }
+input.wh-required { background: var(--wh-required); }
+.barcode-field { background: var(--wh-barcode); color: #fff; font-family: monospace; }
+.wh-header { background: var(--wh-header); color: #fff; padding: 8px 12px; display: flex; gap: 12px; align-items: center; }
+.wh-total-box { background: var(--wh-total); color: #fff; font-weight: bold; padding: 12px; text-align: center; font-size: 20px; }
+.wh-modal { background: var(--wh-modal); border: 2px outset #fff; padding: 16px; }
+.layout { display: flex; flex-direction: column; height: 100%; }
+.cashier-grid { display: grid; grid-template-columns: 1fr 280px; gap: 8px; padding: 8px; flex: 1; min-height: 0; }
+.bottom-bar { display: flex; gap: 4px; padding: 6px; background: #d8d4c0; flex-wrap: wrap; }
+@media (max-width: 1024px) { .cashier-grid { grid-template-columns: 1fr; } }

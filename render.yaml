@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: welad-halal
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run db:migrate:deploy --workspace apps/backend && npm run build --workspace apps/backend
+    startCommand: npm run start:prod --workspace apps/backend
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: https://welad-halal-web-one.vercel.app
