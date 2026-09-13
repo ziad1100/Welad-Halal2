@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { computeDiscountAmount, discountError } from '../../common/utils/discount';
 
 @Injectable()
 export class DiscountsService {
@@ -28,12 +29,9 @@ export class DiscountsService {
   // Server-side validation used by cashier before confirm
   async validate(code: string, subtotal: number) {
     const dc = await this.prisma.discountCode.findUnique({ where: { code } });
-    const now = new Date();
-    if (!dc || !dc.isActive) throw new BadRequestException('Invalid discount');
-    if (dc.validFrom && dc.validFrom > now) throw new BadRequestException('Discount not started');
-    if (dc.validTo && dc.validTo < now) throw new BadRequestException('Discount expired');
-    if (dc.usageLimit != null && dc.usedCount >= dc.usageLimit) throw new BadRequestException('Discount exhausted');
-    const amount = dc.type === 'percentage' ? (subtotal * dc.value) / 100 : Math.min(dc.value, subtotal);
-    return { code: dc.code, type: dc.type, amount };
+    const err = discountError(dc);
+    if (err) throw new BadRequestException(err);
+    const amount = computeDiscountAmount(dc!.type, dc!.value, subtotal);
+    return { code: dc!.code, type: dc!.type, amount };
   }
 }

@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { computeAvgCost } from '../../common/utils/costing';
 
 @Injectable()
 export class PurchasesService {
@@ -42,7 +43,7 @@ export class PurchasesService {
         const oldQty = inv?.quantity ?? 0;
         const oldCost = inv?.avgCost ?? it.unitCost;
         const newQty = oldQty + it.qty;
-        const newCost = newQty > 0 ? (oldQty * oldCost + it.qty * it.unitCost) / newQty : it.unitCost;
+        const newCost = computeAvgCost(oldQty, oldCost, it.qty, it.unitCost);
         if (inv) await tx.inventory.update({ where: { id: inv.id }, data: { quantity: newQty, avgCost: newCost } });
         else await tx.inventory.create({ data: { productId: it.productId, branchId: p.branchId, quantity: newQty, avgCost: newCost } });
         await tx.stockMovement.create({ data: { productId: it.productId, branchId: p.branchId, type: 'purchase', qtyDelta: it.qty, costAtTime: it.unitCost, refId: p.id } });

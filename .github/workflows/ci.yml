@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * 0' # weekly E2E
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: welad
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/welad?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/welad?schema=public
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-only-min-32-chars-test-secret
+      CORS_ORIGIN: http://localhost:5173
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate --schema apps/backend/prisma/schema.prisma
+      - run: npx prisma migrate deploy --schema apps/backend/prisma/schema.prisma
+      - run: npm run seed --workspace @welad/backend
+      - run: npm run test --workspace @welad/backend
+      - run: npm run test --workspace @welad/web
+      - run: npm run build --workspace @welad/backend
+      - run: npm run build --workspace @welad/web
+
+  e2e:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: welad
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/welad?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/welad?schema=public
+      JWT_SECRET: ci-only-min-32-chars-test-secret
+      CORS_ORIGIN: http://localhost:5173
+      VITE_API_URL: http://localhost:3001/api
+      E2E_API_URL: http://localhost:3001/api
+      E2E_WEB_URL: http://localhost:5173
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium --workspace @welad/web
+      - run: npx prisma generate --schema apps/backend/prisma/schema.prisma
+      - run: npx prisma migrate deploy --schema apps/backend/prisma/schema.prisma
+      - run: npm run seed --workspace @welad/backend
+      - run: npm run build --workspace @welad/backend
+      - run: npm run build --workspace @welad/web
+      - run: |
+          (npm run start:prod --workspace @welad/backend > /tmp/backend.log 2>&1 &)
+          (npx vite preview --port 5173 --workspace @welad/web > /tmp/web.log 2>&1 &)
+          for i in $(seq 1 30); do curl -sf http://localhost:3001/api/health && break || sleep 5; done
+          curl -sf http://localhost:3001/api/health/database
+      - run: npm run e2e --workspace @welad/web

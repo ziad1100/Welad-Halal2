@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { computeDiscountAmount, discountError } from '../../common/utils/discount';
 
 interface ConfirmLine {
   productId: string;
@@ -60,13 +61,10 @@ export class OrdersService {
     let discountCodeId: string | undefined;
     if (dto.discountCode) {
       const dc = await this.prisma.discountCode.findUnique({ where: { code: dto.discountCode } });
-      const now = new Date();
-      if (!dc || !dc.isActive) throw new BadRequestException('Invalid discount');
-      if (dc.validFrom && dc.validFrom > now) throw new BadRequestException('Discount not started');
-      if (dc.validTo && dc.validTo < now) throw new BadRequestException('Discount expired');
-      if (dc.usageLimit != null && dc.usedCount >= dc.usageLimit) throw new BadRequestException('Discount exhausted');
-      discountTotal = dc.type === 'percentage' ? (subtotal * dc.value) / 100 : Math.min(dc.value, subtotal);
-      discountCodeId = dc.id;
+      const err = discountError(dc);
+      if (err) throw new BadRequestException(err);
+      discountTotal = computeDiscountAmount(dc!.type, dc!.value, subtotal);
+      discountCodeId = dc!.id;
     }
 
     const deliveryFee = dto.type === 'delivery' ? Number(dto.deliveryFee ?? 0) : 0;

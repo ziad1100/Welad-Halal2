@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { loginApi } from '../../services/api/auth.api';
+import { routeForRole } from '../../lib/routing';
 import { useAuth } from '../../store/authStore';
 
 export function LoginPage() {
@@ -18,9 +19,7 @@ export function LoginPage() {
     try {
       const data = await loginApi(username, password);
       setAuth(data.accessToken, data.user);
-      if (data.user.forcePasswordChange) nav('/change-password');
-      else if (data.user.role === 'employee') nav('/cashier');
-      else nav('/orders');
+      nav(routeForRole(data.user.role, data.user.forcePasswordChange));
     } catch {
       setErr('Invalid credentials');
     }

@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { LoginDto } from './dto/login.dto';
+import { normalizeUsername } from '../../common/utils/username';
 
 @Injectable()
 export class AuthService {
@@ -12,7 +13,7 @@ export class AuthService {
   ) {}
 
   async login(dto: LoginDto) {
-    const normalized = dto.username.trim().replace(/\s+/g, ' ');
+    const normalized = normalizeUsername(dto.username);
     const user = await this.prisma.user.findFirst({
       where: {
         username: { equals: normalized, mode: 'insensitive' },

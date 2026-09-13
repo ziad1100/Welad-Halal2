@@ -34,3 +34,8 @@ npm-debug.log*
 
 # TypeScript build info
 *.tsbuildinfo
+
+# Playwright
+playwright-report/
+test-results/
+blob-report/
