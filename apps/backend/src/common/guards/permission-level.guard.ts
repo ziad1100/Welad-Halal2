@@ -5,7 +5,11 @@ import { Reflector } from '@nestjs/core';
 export class PermissionLevelGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
   canActivate(context: ExecutionContext): boolean {
-    const required = this.reflector.get<number>('requiredLevel', context.getHandler());
+    // getAllAndOverride honors BOTH method-level and controller class-level @RequireLevel
+    const required = this.reflector.getAllAndOverride<number>('requiredLevel', [
+      context.getHandler(),
+      context.getClass(),
+    ]);
     if (required === undefined || required === null) return true;
     const user = context.switchToHttp().getRequest().user;
     return !!user && user.permissionLevel >= required;
