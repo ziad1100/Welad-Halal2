@@ -119,6 +119,7 @@ export class OrdersService {
 
   // F9 hold — no stock movement
   async hold(userId: string, dto: { lines: ConfirmLine[]; customerId?: string; type?: 'pickup' | 'delivery' }) {
+    if (!dto.lines?.length) throw new BadRequestException('Empty cart');
     const branchId = await this.resolveBranch();
     let subtotal = 0;
     const snap: any[] = [];
